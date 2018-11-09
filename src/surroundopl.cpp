@@ -27,6 +27,12 @@
 #include "surroundopl.h"
 #include "debug.h"
 
+#include <stdlib.h>
+#include <stdio.h>
+#include <stdarg.h>
+#include <string.h>
+#include <signal.h>
+
 // Convert 8-bit to 16-bit
 #define CV_8_16(a) ((((unsigned short)(a) << 8) | (a)) - 32768)
 
@@ -44,6 +50,11 @@ CSurroundopl::CSurroundopl(COPLprops *a, COPLprops *b, bool output16bit)
 
 	this->lbuf = new short[this->bufsize];
 	this->rbuf = new short[this->bufsize];
+
+        // Default frequency offset for surroundopl is 128, while values like 384 also work.
+        this->offset = 384;
+        printf("CSurroundopl offset init\n");
+
 };
 
 CSurroundopl::~CSurroundopl()
@@ -127,7 +138,7 @@ void CSurroundopl::write(int reg, int val)
 		// Adjust the frequency and calculate the new FNum
 		//double dbNewFNum = (dbOriginalFreq+(dbOriginalFreq/FREQ_OFFSET)) / (50000.0 * pow(2, iNewBlock - 20));
 		//#define calcFNum() ((dbOriginalFreq+(dbOriginalFreq/FREQ_OFFSET)) / (50000.0 * pow(2, iNewBlock - 20)))
-		#define calcFNum() ((dbOriginalFreq+(dbOriginalFreq/FREQ_OFFSET)) / (49716.0 * pow(2.0, iNewBlock - 20)))
+		#define calcFNum() ((dbOriginalFreq+(dbOriginalFreq/this->offset)) / (49716.0 * pow(2.0, iNewBlock - 20)))
 		double dbNewFNum = calcFNum();
 
 		// Make sure it's in range for the OPL chip
@@ -148,7 +159,6 @@ void CSurroundopl::write(int reg, int val)
 			}
 		} else if (dbNewFNum < 0 + NEWBLOCK_LIMIT) {
 			// It's too low, so move down one block (octave) and recalculate
-
 			if (iNewBlock == 0) {
 				// Uh oh, we're already at the lowest octave!
 				AdPlug_LogWrite("OPL WARN: FNum %d/B#%d would need block -1 after being transposed (new FNum is %d)!\n",
@@ -234,10 +244,20 @@ void CSurroundopl::init()
 			this->iCurrentFNum[c][i] = 0;
 		}
 	}
+
 }
 
 void CSurroundopl::setchip(int n)
 {
 	this->oplA.opl->setchip(n);
 	this->oplB.opl->setchip(n);
+}
+
+void CSurroundopl::set_offset(double offset)
+{
+	if (offset != 0) {
+        	this->offset = offset;
+	}else{
+		this->offset = 128;
+	}
 }
